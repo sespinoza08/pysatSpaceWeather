@@ -26,7 +26,7 @@ Python 3.7+.
 
 | Common modules | Community modules |
 | -------------- | ----------------- |
-| netCDF4        | pysat >= 3.0.4    |
+| netCDF4        | pysat >= 3.1.0    |
 | numpy          |                   |
 | pandas         |                   |
 | requests       |                   |
@@ -64,7 +64,7 @@ instrument.
 ```
 import pysat
 import pysatSpaceWeather
-dst = pysat.Instrument(inst_module=pysatSpaceWeather.instruments.sw_dist)
+dst = pysat.Instrument(inst_module=pysatSpaceWeather.instruments.sw_dst, tag='noaa')
 ```
 
 Another way to use the instruments in an external repository is to register the
@@ -72,6 +72,6 @@ instruments.  This only needs to be done the first time you load an instrument.
 Afterward, pysat will identify them using the `platform` and `name` keywords.
 
 ```
-pysat.utils.registry.register('pysatSpaceWeather.instruments.sw_dst')
-dst = pysat.Instrument('sw', 'dst')
+pysat.utils.registry.register_by_module(pysatSpaceWeather.instruments)
+dst = pysat.Instrument('sw', 'dst', tag='noaa')
 ```
