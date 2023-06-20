@@ -496,6 +496,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                     ftp.retrbinary('RETR ' + fnames,
                                     open(saved_fname, 'wb').write)
                     downloaded = True
+                    print(downloaded)
                     logger.info(' '.join(('Downloaded file for ',
                                             dl_date.strftime('%x'))))
 
