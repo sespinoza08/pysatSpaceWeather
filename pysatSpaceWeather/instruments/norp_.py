@@ -529,6 +529,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
 
                 mm_norp.rewrite_daily_file(dl_date.year, outfile, lines)
                 os.remove(saved_fname)
+            dl_date += pds.DateOffset(days=1)
 
             # Cycle to the next date
 
