@@ -519,10 +519,6 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                         # don't want to keep looking for it.
                         bad_fname.append(fnames)
 
-                # If the first file worked, don't try again
-                if downloaded:
-                    break
-
             if not downloaded:
                 logger.info(' '.join(('File not available for',
                                       dl_date.strftime('%x'))))
