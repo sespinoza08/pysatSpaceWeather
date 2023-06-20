@@ -523,11 +523,18 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                 logger.info(' '.join(('File not available for',
                                       dl_date.strftime('%x'))))
             elif rewritten:
-                with open(saved_fname, 'r') as fprelim:
-                    lines = fprelim.read()
 
-                mm_norp.rewrite_daily_file(dl_date.year, outfile, lines)
-                os.remove(saved_fname)
+
+
+                print('USE NoRP`s code to rewrite the file')
+
+
+
+                # with open(saved_fname, 'r') as fprelim:
+                #     lines = fprelim.read()
+
+                # mm_norp.rewrite_daily_file(dl_date.year, outfile, lines)
+                # os.remove(saved_fname)
             dl_date += pds.DateOffset(days=1)
 
             # Cycle to the next date
