@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Supports F30 index values. Downloads data from NoRP.
+"""Supports F30 index values. Downloads any data from NoRP.
 
 Properties
 ----------
@@ -8,11 +8,9 @@ platform
 name
     'f30'
 tag
-    - 'historic' LASP F30 data (downloads by month, loads by day)
-    - 'prelim' Preliminary SWPC daily solar indices
-    - 'daily' Daily SWPC solar indices (contains last 30 days)
-    - 'forecast' Grab forecast data from SWPC (next 3 days)
-    - '45day' 45-Day Forecast data from the Air Force
+    - 'fits' NoRP F30 data (downloads by month, loads by day)
+    - 'calibrated' Daily NoRP calibrtated data. In .xdr format
+    - 'historic' Historic F30 daily flux data from NoRP (1951-present)
 
 Examples
 --------
@@ -21,25 +19,11 @@ stop on the current date, but a point in the past when post-processing has
 been successfully completed.
 ::
 
+            CHANGE LASP_STIME TO SOMETHING ELSE!!!!!!!
+
     f30 = pysat.Instrument('sw', 'f30', tag='historic')
     f30.download(start=f30.lasp_stime, stop=f30.today())
     f30.load(date=f30.lasp_stime, end_date=f30.today())
-
-
-Note
-----
-The forecast data is stored by generation date, where each file contains the
-forecast for the next three days. Forecast data downloads are only supported
-for the current day. When loading forecast data, the date specified with the
-load command is the date the forecast was generated. The data loaded will span
-three days. To always ensure you are loading the most recent data, load
-the data with tomorrow's date.
-::
-
-    f30 = pysat.Instrument('sw', 'f30', tag='forecast')
-    f30.download()
-    f30.load(date=f30.tomorrow())
-
 
 Warnings
 --------
@@ -47,11 +31,6 @@ The 'forecast' F30 data loads three days at a time. Loading multiple files,
 loading multiple days, the data padding feature, and multi_file_day feature
 available from the pyast.Instrument object is not appropriate for 'forecast'
 data.
-
-Like 'forecast', the '45day' forecast loads a specific period of time (45 days)
-and subsequent files contain overlapping data.  Thus, loading multiple files,
-loading multiple days, the data padding feature, and multi_file_day feature
-available from the pyast.Instrument object is not appropriate for '45day' data.
 
 """
 
@@ -65,7 +44,7 @@ import requests
 import sys
 import warnings
 
-from pysatSpaceWeather.instruments.methods import f30 as mm_f30
+from pysatSpaceWeather.instruments.methods import norp as mm_norp
 from pysatSpaceWeather.instruments.methods import general
 from pysatSpaceWeather.instruments.methods import lisird
 
@@ -76,11 +55,9 @@ logger = pysat.logger
 
 platform = 'sw'
 name = 'f30'
-tags = {'historic': 'Daily LASP value of F30',
-        'prelim': 'Preliminary SWPC daily solar indices',
-        'daily': 'Daily SWPC solar indices (contains last 30 days)',
-        'forecast': 'SWPC Forecast f30 data next (3 days)',
-        '45day': 'Air Force 45-day Forecast'}
+tags = {'fits': 'NoRP data which includes calibrated and raw data',
+        'calibrated': 'Daily NoRP calibrtated data. In .xdr format',
+        'historic': 'Historic F30 daily flux data from NoRP (1951-present)'}
 
 # Dict keyed by inst_id that lists supported tags for each inst_id
 inst_ids = {'': [tag for tag in tags.keys()]}
@@ -91,20 +68,17 @@ now = dt.datetime.utcnow()
 today = dt.datetime(now.year, now.month, now.day)
 tomorrow = today + pds.DateOffset(days=1)
 
-# The LASP archive start day is also important
-lasp_stime = dt.datetime(1947, 2, 14)
+# The NoRP archive start day is also important
+norp_stime = dt.datetime(1951, 11, 1)
 
 # ----------------------------------------------------------------------------
 # Instrument test attributes
 
-_test_dates = {'': {'historic': dt.datetime(2009, 1, 1),
-                    'prelim': dt.datetime(2009, 1, 1),
-                    'daily': tomorrow,
-                    'forecast': tomorrow,
-                    '45day': tomorrow}}
+_test_dates = {'': {'fits': dt.datetime(2009, 1, 1),
+                    'calibrated': dt.datetime(2009, 1, 1)}}
 
 # Other tags assumed to be True
-_test_download_ci = {'': {'prelim': False}}
+_test_download_ci = {'': {'fits': False}}
 
 # ----------------------------------------------------------------------------
 # Instrument methods
@@ -116,32 +90,23 @@ def init(self):
     """Initialize the Instrument object with instrument specific values."""
 
     # Set the required Instrument attributes
-    self.acknowledgements = mm_f30.acknowledgements(self.tag)
-    self.references = mm_f30.references(self.tag)
+    self.acknowledgements = mm_norp.acknowledgements(self.tag)
+    self.references = mm_norp.references(self.tag)
     logger.info(self.acknowledgements)
 
     # Define the historic F30 starting time
     if self.tag == 'historic':
-        self.lasp_stime = lasp_stime
+        self.norp_stime = norp_stime
 
     # Raise Deprecation warnings
-    if self.tag in ['daily', 'prelim']:
+    if self.tag in ['fits', 'calibrated']:
         # This tag loads more than just F30 data, and the behaviour will be
         # deprecated in v0.1.0
         warnings.warn("".join(["Upcoming structural changes will prevent ",
-                               "Instruments from loading multiple data sets in",
-                               " one Instrument. In version 0.1.0+ the SSN, ",
-                               "solar flare, and solar mean field data will be",
-                               " accessable from the `sw_ssn`, `sw_flare`, ",
-                               "and `sw_sbfield` Instruments."]),
-                      DeprecationWarning, stacklevel=2)
-    elif self.tag == '45day':
-        # This tag loads more than just F30 data, and the behaviour will be
-        # deprecated in v0.1.0
-        warnings.warn("".join(["Upcoming structural changes will prevent ",
-                               "Instruments from loading multiple data sets in",
-                               " one Instrument. In version 0.1.0+ the Ap will",
-                               " be accessable from the `sw_ap` Instrument."]),
+                               "Instruments from loading multiple data sets ",
+                               "in one Instrument. In version 0.1.0+ the ",
+                               "separate solar indicies will be accessable ",
+                               "from new Instruments."]),
                       DeprecationWarning, stacklevel=2)
 
     return
@@ -188,7 +153,7 @@ def load(fnames, tag='', inst_id=''):
 
     # Get the desired file dates and file names from the daily indexed list
     file_dates = list()
-    if tag in ['historic', 'prelim']:
+    if tag in ['fits', 'calibrated']:
         unique_files = list()
         for fname in fnames:
             file_dates.append(dt.datetime.strptime(fname[-10:], '%Y-%m-%d'))
@@ -197,8 +162,9 @@ def load(fnames, tag='', inst_id=''):
         fnames = unique_files
 
     # Load the CSV data files
-    data = pysat.instruments.methods.general.load_csv_data(
-        fnames, read_csv_kwargs={"index_col": 0, "parse_dates": True})
+    if tag=='historic':
+        data = pysat.instruments.methods.general.load_csv_data(
+            fnames, read_csv_kwargs={"index_col": 0, "parse_dates": True})
 
     # If there is a date range, downselect here
     if len(file_dates) > 0:
@@ -385,7 +351,7 @@ def list_files(tag='', inst_id='', data_path='', format_str=None):
             out_files = out_files + '_' + out_files.index.strftime(
                 '%Y-%m-%d')
 
-    elif tag == 'prelim':
+    elif tag == 'fits':
         # Files are by year (and quarter)
         if format_str is None:
             format_str = ''.join(['f30_prelim_{year:04d}_{month:02d}',
@@ -427,18 +393,6 @@ def list_files(tag='', inst_id='', data_path='', format_str=None):
             out_files = out_files.sort_index()
             out_files = out_files + '_' + out_files.index.strftime('%Y-%m-%d')
 
-    elif tag in ['daily', 'forecast', '45day']:
-        format_str = ''.join(['f30_', tag,
-                              '_{year:04d}-{month:02d}-{day:02d}.txt'])
-        out_files = pysat.Files.from_os(data_path=data_path,
-                                        format_str=format_str)
-
-        # Pad list of files data to include most recent file under tomorrow
-        if not out_files.empty:
-            pds_off = pds.DateOffset(days=1)
-            out_files.loc[out_files.index[-1] + pds_off] = out_files.values[-1]
-            out_files.loc[out_files.index[-1] + pds_off] = out_files.values[-1]
-
     return out_files
 
 
@@ -474,23 +428,23 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
 
     """
     # Download standard f30 data
-    if tag == 'historic':
-        # Test the date array, updating it if necessary
-        if date_array.freq != 'MS':
-            date_array = pysat.utils.time.create_date_range(
-                dt.datetime(date_array[0].year, date_array[0].month, 1),
-                date_array[-1], freq='MS')
 
-        # Download from LASP, by month
-        freq = pds.DateOffset(months=1, seconds=-1)
-        lisird.download(date_array, data_path, 'f30_monthly_', '%Y-%m',
-                        'noaa_radio_flux', freq, update_files,
-                        {'f30_adjusted': -99999.0, 'f30_observed': -99999.0})
 
-    elif tag == 'prelim':
-        ftp = ftplib.FTP('ftp.swpc.noaa.gov')  # Connect to host, default port
-        ftp.login()  # User anonymous, passwd anonymous
-        ftp.cwd('/pub/indices/old_indices')
+    if tag=='historic':
+        # No arguments necessary, only one file is downloaded
+        furl='https://solar.nro.nao.ac.jp/'+\
+             +'norp/data/daily/TYKW-NoRP_dailyflux.txt'
+        req = requests.get(furl)
+
+        # Save the output
+        data_file = 'norp_historic.csv'
+        outfile = os.path.join(data_path, data_file)
+        mm_norp.rewrite_historic_file(outfile, req.text)
+
+    elif tag == 'fits':
+        ftp = ftplib.FTP('ftp.solar-pub.nao.ac.jp') # Connect to the server
+        ftp.login('', 'anon@example.com')  # User anonymous, passwd anonymous
+        ftp.cwd('pub/nsro/norp/fits')
 
         bad_fname = list()
 
@@ -507,15 +461,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
         while dl_date <= date_array[-1]:
             # The file name changes, depending on how recent the requested
             # data is
-            qnum = (dl_date.month - 1) // 3 + 1  # Integer floor division
-            qmonth = (qnum - 1) * 3 + 1
-            quar = 'Q{:d}_'.format(qnum)
-            fnames = ['{:04d}{:s}DSD.txt'.format(dl_date.year, ss)
-                      for ss in ['_', quar]]
-            versions = ["01_v2", "{:02d}_v1".format(qmonth)]
-            vend = [dt.datetime(dl_date.year, 12, 31),
-                    dt.datetime(dl_date.year, qmonth, 1)
-                    + pds.DateOffset(months=3) - pds.DateOffset(days=1)]
+            fnames = 'norp'+dl_date.strftime('%y%m%d')+'.fits.gz'
             downloaded = False
             rewritten = False
 
@@ -527,9 +473,8 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
 
                 local_fname = fname
                 saved_fname = os.path.join(data_path, local_fname)
-                ofile = '_'.join(['f30', 'prelim',
-                                  '{:04d}'.format(dl_date.year),
-                                  '{:s}.txt'.format(versions[iname])])
+                ofile = '_'.join(['norp', 'fits',
+                                  fname])
                 outfile = os.path.join(data_path, ofile)
 
                 if os.path.isfile(outfile):
@@ -537,15 +482,6 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
 
                     # Check the date to see if this should be rewritten
                     checkfile = os.path.split(outfile)[-1]
-                    has_file = local_files == checkfile
-                    if np.any(has_file):
-                        if has_file[has_file].index[-1] < vend[iname]:
-                            # This file will be updated again, but only attempt
-                            # to do so if enough time has passed from the
-                            # last time it was downloaded
-                            yesterday = today - pds.DateOffset(days=1)
-                            if has_file[has_file].index[-1] < yesterday:
-                                rewritten = True
                 else:
                     # The file does not exist, if it can be downloaded, it
                     # should be 'rewritten'
@@ -590,17 +526,15 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                 with open(saved_fname, 'r') as fprelim:
                     lines = fprelim.read()
 
-                mm_f30.rewrite_daily_file(dl_date.year, outfile, lines)
+                mm_norp.rewrite_daily_file(dl_date.year, outfile, lines)
                 os.remove(saved_fname)
 
             # Cycle to the next date
-            dl_date = vend[iname] + pds.DateOffset(days=1)
 
         # Close connection after downloading all dates
         ftp.close()
 
-    elif tag == 'daily':
-        logger.info('This routine can only download the latest 30 day file')
+    elif tag == 'calibrated':
 
         # Set the download webpage
         furl = 'https://services.swpc.noaa.gov/text/daily-solar-indices.txt'
@@ -609,43 +543,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
         # Save the output
         data_file = 'f30_daily_{:s}.txt'.format(today.strftime('%Y-%m-%d'))
         outfile = os.path.join(data_path, data_file)
-        mm_f30.rewrite_daily_file(today.year, outfile, req.text)
-
-    elif tag == 'forecast':
-        logger.info(' '.join(('This routine can only download the current',
-                              'forecast, not archived forecasts')))
-        # Set the download webpage
-        furl = ''.join(('https://services.swpc.noaa.gov/text/',
-                        '3-day-solar-geomag-predictions.txt'))
-        req = requests.get(furl)
-
-        # Parse text to get the date the prediction was generated
-        date_str = req.text.split(':Issued: ')[-1].split(' UTC')[0]
-        dl_date = dt.datetime.strptime(date_str, '%Y %b %d %H%M')
-
-        # Get starting date of the forecasts
-        raw_data = req.text.split(':Prediction_dates:')[-1]
-        forecast_date = dt.datetime.strptime(raw_data[3:14], '%Y %b %d')
-
-        # Set the times for output data
-        times = pds.date_range(forecast_date, periods=3, freq='1D')
-
-        # String data is the forecast value for the next three days
-        raw_data = req.text.split('10cm_flux:')[-1]
-        raw_data = raw_data.split('\n')[1]
-        val1 = np.int64(raw_data[24:27])
-        val2 = np.int64(raw_data[38:41])
-        val3 = np.int64(raw_data[52:])
-
-        # Put data into nicer DataFrame
-        data = pds.DataFrame([val1, val2, val3], index=times, columns=['f30'])
-
-        # Write out as a file
-        data_file = 'f30_forecast_{:s}.txt'.format(
-            dl_date.strftime('%Y-%m-%d'))
-        data.to_csv(os.path.join(data_path, data_file), header=True)
-
-    elif tag == '45day':
+        mm_norp.rewrite_daily_file(today.year, outfile, req.text)
         logger.info(' '.join(('This routine can only download the current',
                               'forecast, not archived forecasts')))
 
@@ -669,10 +567,10 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
         raw_f30 = raw_f30.split('\n')[1:-4]
 
         # Parse the AP data
-        ap_times, ap = mm_f30.parse_45day_block(raw_ap)
+        ap_times, ap = mm_norp.parse_45day_block(raw_ap)
 
         # Parse the F30 data
-        f30_times, f30 = mm_f30.parse_45day_block(raw_f30)
+        f30_times, f30 = mm_norp.parse_45day_block(raw_f30)
 
         # Collect into DataFrame
         data = pds.DataFrame(f30, index=f30_times, columns=['f30'])
