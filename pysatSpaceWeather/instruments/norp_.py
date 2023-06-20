@@ -466,56 +466,55 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
             rewritten = False
 
             # Attempt the download(s)
-            for iname, fname in enumerate(fnames):
-                # Test to see if we already tried this filename
-                if fname in bad_fname:
-                    continue
+            # Test to see if we already tried this filename
+            if fnames in bad_fname:
+                continue
 
-                local_fname = fname
-                saved_fname = os.path.join(data_path, local_fname)
-                ofile = '_'.join(['norp', 'fits',
-                                  fname])
-                outfile = os.path.join(data_path, ofile)
+            local_fname = fnames
+            saved_fname = os.path.join(data_path, local_fname)
+            ofile = '_'.join(['norp', 'fits',
+                                fnames])
+            outfile = os.path.join(data_path, ofile)
 
-                if os.path.isfile(outfile):
+            if os.path.isfile(outfile):
+                downloaded = True
+
+                # Check the date to see if this should be rewritten
+                checkfile = os.path.split(outfile)[-1]
+            else:
+                # The file does not exist, if it can be downloaded, it
+                # should be 'rewritten'
+                rewritten = True
+
+            # Attempt to download if the file does not exist or if the
+            # file has been updated
+            if rewritten or not downloaded:
+                try:
+                    sys.stdout.flush()
+                    print(fnames)
+                    print(saved_fname)
+                    ftp.retrbinary('RETR ' + fnames,
+                                    open(saved_fname, 'wb').write)
                     downloaded = True
+                    logger.info(' '.join(('Downloaded file for ',
+                                            dl_date.strftime('%x'))))
 
-                    # Check the date to see if this should be rewritten
-                    checkfile = os.path.split(outfile)[-1]
-                else:
-                    # The file does not exist, if it can be downloaded, it
-                    # should be 'rewritten'
-                    rewritten = True
+                except ftplib.error_perm as exception:
+                    # Could not fetch, so cannot rewrite
+                    rewritten = False
 
-                # Attempt to download if the file does not exist or if the
-                # file has been updated
-                if rewritten or not downloaded:
-                    try:
-                        sys.stdout.flush()
-                        print(fname)
-                        print(saved_fname)
-                        ftp.retrbinary('RETR ' + fname,
-                                       open(saved_fname, 'wb').write)
-                        downloaded = True
-                        logger.info(' '.join(('Downloaded file for ',
-                                              dl_date.strftime('%x'))))
+                    # Test for an error
+                    if str(exception.args[0]).split(" ", 1)[0] != '550':
+                        raise IOError(exception)
+                    else:
+                        # file isn't actually there, try the next name
+                        os.remove(saved_fname)
 
-                    except ftplib.error_perm as exception:
-                        # Could not fetch, so cannot rewrite
-                        rewritten = False
-
-                        # Test for an error
-                        if str(exception.args[0]).split(" ", 1)[0] != '550':
-                            raise IOError(exception)
-                        else:
-                            # file isn't actually there, try the next name
-                            os.remove(saved_fname)
-
-                            # Save this so we don't try again
-                            # Because there are two possible filenames for
-                            # each time, it's ok if one isn't there.  We just
-                            # don't want to keep looking for it.
-                            bad_fname.append(fname)
+                        # Save this so we don't try again
+                        # Because there are two possible filenames for
+                        # each time, it's ok if one isn't there.  We just
+                        # don't want to keep looking for it.
+                        bad_fname.append(fnames)
 
                 # If the first file worked, don't try again
                 if downloaded:
