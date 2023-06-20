@@ -492,6 +492,8 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                 if rewritten or not downloaded:
                     try:
                         sys.stdout.flush()
+                        print(fname)
+                        print(saved_fname)
                         ftp.retrbinary('RETR ' + fname,
                                        open(saved_fname, 'wb').write)
                         downloaded = True
