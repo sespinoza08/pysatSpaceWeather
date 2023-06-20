@@ -502,7 +502,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                 except ftplib.error_perm as exception:
                     # Could not fetch, so cannot rewrite
                     rewritten = False
-
+                    print('whoops')
                     # Test for an error
                     if str(exception.args[0]).split(" ", 1)[0] != '550':
                         raise IOError(exception)
