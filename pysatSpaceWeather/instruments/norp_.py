@@ -474,7 +474,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
 
             local_fname = fnames
             saved_fname = os.path.join(data_path, local_fname)
-            ofile = '_'.join(['norp', 'fits',
+            ofile = '/'.join(['f30', 'fits',
                                 fnames])
             outfile = os.path.join(data_path, ofile)
 
