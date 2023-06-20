@@ -442,9 +442,9 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
         mm_norp.rewrite_historic_file(outfile, req.text)
 
     elif tag == 'fits':
+        homedir = '/pub/nsro/norp/fits/'
         ftp = ftplib.FTP('solar-pub.nao.ac.jp') # Connect to the server
         ftp.login('', 'anon@example.com')  # User anonymous, passwd anonymous
-        ftp.cwd('/pub/nsro/norp/fits/')
 
         bad_fname = list()
 
@@ -459,6 +459,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
         # To avoid downloading multiple files, cycle dates based on file length
         dl_date = date_array[0]
         while dl_date <= date_array[-1]:
+            ftp.cwd(homedir)
             ftp.cwd(str(dl_date.year)+'/'+str(dl_date.month))
             # The file name changes, depending on how recent the requested
             # data is
@@ -497,14 +498,12 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
                     ftp.retrbinary('RETR ' + fnames,
                                     open(saved_fname, 'wb').write)
                     downloaded = True
-                    print(downloaded)
                     logger.info(' '.join(('Downloaded file for ',
                                             dl_date.strftime('%x'))))
 
                 except ftplib.error_perm as exception:
                     # Could not fetch, so cannot rewrite
                     rewritten = False
-                    print('whoops')
                     # Test for an error
                     if str(exception.args[0]).split(" ", 1)[0] != '550':
                         raise IOError(exception)
