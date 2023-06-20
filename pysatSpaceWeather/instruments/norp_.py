@@ -444,7 +444,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
     elif tag == 'fits':
         ftp = ftplib.FTP('solar-pub.nao.ac.jp') # Connect to the server
         ftp.login('', 'anon@example.com')  # User anonymous, passwd anonymous
-        ftp.cwd('pub/nsro/norp/fits')
+        ftp.cwd('pub/nsro/norp/fits/')
 
         bad_fname = list()
 
