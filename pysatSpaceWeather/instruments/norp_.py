@@ -459,6 +459,7 @@ def download(date_array, tag, inst_id, data_path, update_files=False):
         # To avoid downloading multiple files, cycle dates based on file length
         dl_date = date_array[0]
         while dl_date <= date_array[-1]:
+            ftp.cwd(str(dl_date.year)+'/'+str(dl_date.month))
             # The file name changes, depending on how recent the requested
             # data is
             fnames = 'norp'+dl_date.strftime('%y%m%d')+'.fits.gz'
