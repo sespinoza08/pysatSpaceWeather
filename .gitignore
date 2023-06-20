@@ -71,3 +71,6 @@ custom_lint.sh
 
 # IDEs
 .idea/
+
+# Notebook for testing
+testing.ipynb
